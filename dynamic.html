@@ -110,7 +110,7 @@
 </div>
 
 <script>
-const API_BASE = 'https://api.vibrant-wellness.com';
+const API_BASE = 'https://api.vibrant-wellness.com/v1/lis/base-report-service';
 const API_URL = API_BASE + '/result/rangeDiffReport?hours=4';
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwdXJwb3NlIjoicmFuZ2UtZGlmZi1yZXBvcnQiLCJpYXQiOjE3NzUxNTg0OTIsImV4cCI6MTc4MjkzNDQ5Mn0.UAfXnyAOVU7mrpoAZBQoCksLI3n_9fq1IU3eNGhIDRs'; // minimal token: payload is only {purpose: "range-diff-report", iat, exp}. No userId/role/customerId — cannot be used to access any report data, only passes JWT signature check for this endpoint. Expires ~2026-07-01.
 

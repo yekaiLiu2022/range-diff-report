@@ -171,7 +171,7 @@ function renderReport(DATA) {
     if (!p || p.count === 0) continue;
     const cfg = PATTERN_CONFIG[key] || {};
     grid.innerHTML += '<div class="summary-card" style="border-color:' + cfg.color + '" onclick="document.getElementById(\'pattern-' + key + '\').scrollIntoView({behavior:\'smooth\'})">' +
-      '<div class="count" style="color:' + cfg.color + '">' + p.count + ' <span class="pct">(' + p.pct + '% excluding Pattern A)</span></div>' +
+      '<div class="count" style="color:' + cfg.color + '">' + p.count + ' <span class="pct">(' + (p.pctOfTotal || p.pct) + '% of total, ' + (p.pctExcludingA || p.pct) + '% excluding A)</span></div>' +
       '<div class="label">Pattern ' + key + ': ' + p.name + '</div>' +
       '<div class="detail">' + p.testIds.length + ' testIds · ' + p.sampleIds.length + ' sampleIds</div>' +
     '</div>';
@@ -182,7 +182,7 @@ function renderReport(DATA) {
   new Chart(document.getElementById('pieChart'), {
     type: 'doughnut',
     data: {
-      labels: activePatterns.map(k => k + ': ' + DATA[k].name + ' (' + DATA[k].pct + '%)'),
+      labels: activePatterns.map(k => k + ': ' + DATA[k].name + ' (' + (DATA[k].pctExcludingA || DATA[k].pct) + '% excl. A)'),
       datasets: [{ data: activePatterns.map(k => DATA[k].count), backgroundColor: activePatterns.map(k => PATTERN_CONFIG[k]?.color || '#999'), borderWidth: 2, borderColor: '#fff' }]
     },
     options: {
@@ -281,7 +281,7 @@ function renderReport(DATA) {
       '<div class="pattern-section">' +
         '<div class="pattern-header"><span class="pattern-badge" style="background:' + cfg.color + '">Pattern ' + key + '</span><h2>' + p.name + '</h2></div>' +
         '<div class="pattern-desc">' + cfg.desc + '</div>' +
-        '<div class="pattern-stats">Records: <span>' + p.count + '</span> (<span>' + p.pct + '%</span> excluding Pattern A) &nbsp;|&nbsp; Distinct TestIds: <span>' + p.testIds.length + '</span> &nbsp;|&nbsp; Distinct SampleIds: <span>' + p.sampleIds.length + '</span></div>' +
+        '<div class="pattern-stats">Records: <span>' + p.count + '</span> (<span>' + (p.pctOfTotal || p.pct) + '%</span> of total, <span>' + (p.pctExcludingA || p.pct) + '%</span> excluding Pattern A) &nbsp;|&nbsp; Distinct TestIds: <span>' + p.testIds.length + '</span> &nbsp;|&nbsp; Distinct SampleIds: <span>' + p.sampleIds.length + '</span></div>' +
         '<div class="root-cause">' + (rc.cause || '') + '<br><br><strong>Suggested Fix:</strong> ' + (rc.fix || '') + '</div>' +
         '<div class="impact-note ' + impactClass + '">&#9888;&#65039; <strong>Impact (' + (rc.impact || 'unknown') + '):</strong> ' + (rc.impactText || '') + '</div>' +
         '<h3 style="margin:14px 0 6px;font-size:14px">Top Affected TestIds</h3>' +

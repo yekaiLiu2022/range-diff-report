@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Range Data Diff Report (Live) — CloudCore V1 vs Azure LIS-Lab-test</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #2c3e50; line-height: 1.6; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 28px; margin-bottom: 4px; color: #1a1a2e; }
+  .subtitle { color: #666; margin-bottom: 24px; font-size: 13px; }
+  .subtitle code { background: #e8eaf6; padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+  .top-stats { display: flex; gap: 20px; margin-bottom: 24px; font-size: 14px; color: #555; flex-wrap: wrap; }
+  .top-stats .stat { background: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .top-stats .stat strong { font-size: 22px; color: #1a1a2e; display: block; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .summary-card { background: white; border-radius: 12px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 5px solid; cursor: pointer; transition: transform 0.15s; }
+  .summary-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+  .summary-card .count { font-size: 32px; font-weight: 700; }
+  .summary-card .pct { font-size: 14px; color: #888; font-weight: 400; }
+  .summary-card .label { font-size: 13px; color: #444; margin-top: 4px; font-weight: 600; }
+  .summary-card .detail { font-size: 11px; color: #999; margin-top: 6px; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+  .chart-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .chart-card h3 { margin-bottom: 12px; font-size: 15px; color: #333; }
+  .pattern-section { background: white; border-radius: 12px; padding: 24px; margin-bottom: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .pattern-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .pattern-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; color: white; font-weight: 700; font-size: 14px; }
+  .pattern-header h2 { font-size: 20px; color: #1a1a2e; }
+  .pattern-desc { color: #666; font-size: 14px; margin-bottom: 12px; }
+  .pattern-stats { display: flex; gap: 20px; margin-bottom: 14px; font-size: 13px; color: #666; }
+  .pattern-stats span { font-weight: 700; color: #333; }
+  .root-cause { background: #fff8e1; border-left: 4px solid #ffc107; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 16px; font-size: 13px; line-height: 1.7; }
+  .root-cause strong { color: #e65100; }
+  .impact-note { background: #fce4ec; border-left: 4px solid #e91e63; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 14px; font-size: 13px; }
+  .impact-low { background: #e8f5e9; border-color: #4caf50; }
+  .impact-medium { background: #fff3e0; border-color: #ff9800; }
+  .example-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+  .example-table th { background: #f1f3f5; padding: 8px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; }
+  .example-table td { padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  .example-table tr:hover td { background: #f8f9fa; }
+  .diff-detail { margin: 8px 0; }
+  .diff-item { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; padding: 6px 10px; border-radius: 4px; margin-bottom: 4px; font-size: 11px; font-family: 'SF Mono', 'Menlo', monospace; }
+  .diff-item.missing { background: #ffebee; }
+  .diff-item.extra { background: #e8f5e9; }
+  .diff-item.different { background: #fff3e0; }
+  .diff-label { font-weight: 600; color: #555; font-size: 10px; text-transform: uppercase; }
+  .cloud-val { color: #1565c0; font-weight: 600; }
+  .azure-val { color: #2e7d32; font-weight: 600; }
+  .null-val { color: #999; font-style: italic; }
+  .collapsible { cursor: pointer; user-select: none; color: #1976d2; font-size: 12px; padding: 4px 0; }
+  .collapsible::before { content: '▶ '; font-size: 10px; }
+  .collapsible.open::before { content: '▼ '; }
+  .collapse-content { display: none; }
+  .collapse-content.show { display: block; }
+  .testid-list { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+  .testid-chip { background: #e8eaf6; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; }
+  .testid-chip .chip-count { color: #666; font-size: 10px; }
+  .legend-row { display: flex; gap: 16px; margin: 10px 0 4px; font-size: 11px; color: #666; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 2px; }
+  a.anchor { text-decoration: none; color: inherit; }
+  .loading { text-align: center; padding: 60px; font-size: 18px; color: #888; }
+  .loading .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid #ddd; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 12px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-msg { text-align: center; padding: 40px; color: #e74c3c; font-size: 16px; }
+  @media (max-width: 768px) { .charts-row { grid-template-columns: 1fr; } .summary-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Range Data Diff Report <span style="font-size:14px;color:#4caf50;font-weight:400">(Live — last 4 hours)</span></h1>
+  <p class="subtitle">
+    <strong>CloudCore V1</strong> (production, on-premise) vs <strong>Azure LIS-Lab-test</strong> (AKS) &nbsp;|&nbsp;
+    Table: <code>lis_report_info.range_data_comparison</code> &nbsp;|&nbsp; Generated: <span id="generatedAt">loading...</span>
+  </p>
+
+  <div id="loadingIndicator" class="loading"><span class="spinner"></span>Fetching latest data from API...</div>
+  <div id="errorMsg" class="error-msg" style="display:none"></div>
+  <div id="reportContent" style="display:none">
+    <div class="top-stats">
+      <div class="stat">Total Records (last 4h)<strong id="statTotal">—</strong></div>
+      <div class="stat">Pattern A (excluded)<strong id="statPatternA">—</strong><span style="font-size:11px;color:#999"> old sample receive data</span></div>
+      <div class="stat">Analyzed Below<strong id="totalNonA">—</strong></div>
+    </div>
+
+    <div style="background:#fff3e0;border-radius:12px;padding:18px 24px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #ff9800">
+      <h3 style="margin-bottom:8px;color:#e65100">Pattern A: Azure "Error enriching collection time" — <span id="patternACount">—</span> records (<span id="patternAPct">—</span>% of total)</h3>
+      <p style="font-size:13px;color:#555;margin-bottom:8px">Old samples (2022-2023) whose tube receive data was never migrated from 153 legacy DB to Core V1/V2 DB. Azure LIS-Lab-test queries <code>lis_core_v7.tube_receive</code> → finds nothing → returns error. CloudCore V1 reads 153 slave DB directly and works fine.</p>
+      <p style="font-size:13px;color:#555;margin-bottom:0"><strong>Status:</strong> Wang has communicated to the LIS-Lab-test team (2026-04-01). <strong>Not shown below.</strong></p>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Distribution by Pattern (excluding Pattern A)</h3>
+        <canvas id="pieChart" height="260"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Top 30 TestIds by Record Count</h3>
+        <canvas id="barChart" height="500"></canvas>
+      </div>
+    </div>
+
+    <div id="patternSections"></div>
+  </div>
+</div>
+
+<script>
+const API_BASE = 'https://api.vibrant-wellness.com';
+const API_URL = API_BASE + '/result/rangeDiffReport?hours=4';
+
+const PATTERN_CONFIG = {
+  B: { color: '#e74c3c', desc: 'CloudCore returns error (missing master data), Azure has correct range data' },
+  C: { color: '#f39c12', desc: 'Azure LOW_ABNORMAL l3 lower bound too high — CloudCore is correct in 99.6% of cases' },
+  D: { color: '#3498db', desc: 'Azure endpoint missing precision_digit, reportable_range, reference_range_value_type, or range boundary fields' },
+  E: { color: '#9b59b6', desc: 'Entire RESULT_NORMAL range type entry missing from Azure' },
+  F: { color: '#27ae60', desc: 'Multiple range boundary values differ significantly between CloudCore and Azure' },
+};
+
+const ROOT_CAUSES = {
+  B: { cause: 'CloudCore V1 returns <code>{"Error":"All_Tests_List is None, age:xxx,genderXxx"}</code> — the master data for these testIds does not exist in CloudCore\'s database for the given age/gender. <strong>Azure has the correct data.</strong>', impact: 'high', impactText: 'These tests get NO reference range on reports served by CloudCore V1.', fix: 'Add master data for these testIds in CloudCore V1.' },
+  C: { cause: '<strong>~99.6% are the same issue: Azure\'s LOW_ABNORMAL l3 lower bound is too high.</strong> CloudCore correctly uses <code>0.0</code> or <code>0</code>, while Azure uses <code>0.01</code> or <code>0.1</code>. This creates a gap at the bottom of the zone — 0 is a valid measurement.', impact: 'medium', impactText: 'Azure\'s l3 lower bound values create gaps at the bottom of the LOW_ABNORMAL zone. CloudCore is correct.', fix: 'Fix Azure endpoint to use <code>0.0</code>/<code>0</code> as the lower bound for LOW_ABNORMAL l3.' },
+  D: { cause: 'Azure is missing fields: <code>precision_digit</code>, <code>reportable_range_min/max</code>, <code>reference_range_value_type</code>. Mainly newer testIds (102xx series). <strong>CloudCore has the data.</strong>', impact: 'high', impactText: 'Reports served by Azure cannot calculate correct reference ranges for these tests.', fix: 'Complete data migration/sync for these testIds in Azure range database.' },
+  E: { cause: 'The entire <code>RESULT_NORMAL</code> range type entry is missing from Azure. CloudCore has it.', impact: 'high', impactText: 'Without NORMAL range, reports cannot determine if results are normal or abnormal.', fix: 'Add RESULT_NORMAL range entries for these testIds in Azure range database.' },
+  F: { cause: 'Multiple range boundary values (l3, l4, normal_min, normal_max) differ significantly.', impact: 'medium', impactText: 'Patients may get different risk classifications depending on which endpoint serves the data.', fix: 'Investigate per-testId which data source is authoritative, then sync.' },
+};
+
+async function loadReport() {
+  try {
+    const resp = await fetch(API_URL);
+    if (!resp.ok) throw new Error('API returned ' + resp.status);
+    const DATA = await resp.json();
+    document.getElementById('loadingIndicator').style.display = 'none';
+    document.getElementById('reportContent').style.display = 'block';
+    renderReport(DATA);
+  } catch (e) {
+    document.getElementById('loadingIndicator').style.display = 'none';
+    const errDiv = document.getElementById('errorMsg');
+    errDiv.style.display = 'block';
+    errDiv.innerHTML = 'Failed to load data: ' + e.message + '<br><br><small>API endpoint: ' + API_URL + '</small><br><small>Make sure you can access the API. Try opening <a href="' + API_URL + '" target="_blank">' + API_URL + '</a> directly.</small>';
+  }
+}
+
+function renderReport(DATA) {
+  const meta = DATA._meta || {};
+  const totalAll = meta.totalAll || 0;
+  const totalNonA = meta.totalNonA || 0;
+  const patternACount = meta.patternACount || 0;
+  const patternAPct = totalAll > 0 ? ((patternACount / totalAll) * 100).toFixed(1) : '0';
+
+  document.getElementById('generatedAt').textContent = meta.generatedAt ? new Date(meta.generatedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'medium' }) + ' PDT' : 'unknown';
+  document.getElementById('statTotal').textContent = totalAll;
+  document.getElementById('statPatternA').textContent = patternACount;
+  document.getElementById('totalNonA').textContent = totalNonA;
+  document.getElementById('patternACount').textContent = patternACount;
+  document.getElementById('patternAPct').textContent = patternAPct;
+
+  const patternOrder = ['B', 'C', 'D', 'E', 'F'];
+
+  // Summary cards
+  const grid = document.getElementById('summaryGrid');
+  for (const key of patternOrder) {
+    const p = DATA[key];
+    if (!p || p.count === 0) continue;
+    const cfg = PATTERN_CONFIG[key] || {};
+    grid.innerHTML += '<div class="summary-card" style="border-color:' + cfg.color + '" onclick="document.getElementById(\'pattern-' + key + '\').scrollIntoView({behavior:\'smooth\'})">' +
+      '<div class="count" style="color:' + cfg.color + '">' + p.count + ' <span class="pct">(' + p.pct + '% excluding Pattern A)</span></div>' +
+      '<div class="label">Pattern ' + key + ': ' + p.name + '</div>' +
+      '<div class="detail">' + p.testIds.length + ' testIds · ' + p.sampleIds.length + ' sampleIds</div>' +
+    '</div>';
+  }
+
+  // Pie chart
+  const activePatterns = patternOrder.filter(k => DATA[k]?.count > 0);
+  new Chart(document.getElementById('pieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: activePatterns.map(k => k + ': ' + DATA[k].name + ' (' + DATA[k].pct + '%)'),
+      datasets: [{ data: activePatterns.map(k => DATA[k].count), backgroundColor: activePatterns.map(k => PATTERN_CONFIG[k]?.color || '#999'), borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } } },
+      onClick: (evt, elements) => {
+        if (elements.length > 0) {
+          const key = activePatterns[elements[0].index];
+          document.getElementById('pattern-' + key)?.scrollIntoView({behavior: 'smooth'});
+        }
+      }
+    }
+  });
+
+  // Bar chart — top testIds from examples
+  const testIdCounts = {};
+  for (const key of patternOrder) {
+    for (const ex of (DATA[key]?.examples || [])) {
+      testIdCounts[ex.testId] = testIdCounts[ex.testId] || { count: 0, pattern: key };
+      testIdCounts[ex.testId].count++;
+    }
+  }
+  const top30 = Object.entries(testIdCounts).sort((a, b) => b[1].count - a[1].count).slice(0, 30);
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: top30.map(([tid]) => 'testId ' + tid),
+      datasets: [{ label: 'Records', data: top30.map(([, v]) => v.count), backgroundColor: top30.map(([, v]) => (PATTERN_CONFIG[v.pattern]?.color || '#999') + 'cc'), borderWidth: 1 }]
+    },
+    options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+  });
+
+  // Pattern sections
+  const sections = document.getElementById('patternSections');
+  for (const key of patternOrder) {
+    const p = DATA[key];
+    if (!p || p.count === 0) continue;
+    const cfg = PATTERN_CONFIG[key] || {};
+    const rc = ROOT_CAUSES[key] || {};
+
+    let examplesHtml = '';
+    for (const ex of (p.examples || [])) {
+      const diffs = (ex.diff?.differences || []);
+      const diffsHtml = diffs.slice(0, 10).map(function(d) {
+        const fmtVal = function(v, cls) {
+          if (v === null || v === undefined) return '<span class="null-val">null</span>';
+          if (typeof v === 'object') {
+            if (Array.isArray(v)) return '<span class="' + cls + '">[' + v.length + ' entries]</span>';
+            const keys = ['test_id','reference_range_type','value_type','value_min','value_max','precision_digit','reportable_range_min','reportable_range_max','gender','hormones'];
+            const parts = [];
+            for (const k of keys) {
+              const full = k.startsWith('value_') ? 'reference_range_' + k : (k === 'gender' ? 'reference_range_gender' : (k === 'value_type' ? 'reference_range_value_type' : k));
+              if (v[full] !== undefined && v[full] !== null && v[full] !== 'nan' && v[full] !== 'None') parts.push('<b>' + k + '</b>=' + v[full]);
+            }
+            return '<span class="' + cls + '">' + (parts.length ? parts.join(', ') : JSON.stringify(v).substring(0, 100) + '...') + '</span>';
+          }
+          return '<span class="' + cls + '">' + String(v) + '</span>';
+        };
+        const cv = fmtVal(d.cloud_core_value, 'cloud-val');
+        const av = fmtVal(d.azure_range_endpoint_value, 'azure-val');
+        return '<div class="diff-item ' + d.type + '"><div style="word-break:break-all"><span class="diff-label">' + d.type + ':</span> ' + d.path + '</div><div>CloudCore: ' + cv + '</div><div>Azure: ' + av + '</div></div>';
+      }).join('');
+      const moreCount = diffs.length - 10;
+      const moreHtml = moreCount > 0 ? '<div style="padding:2px 10px;color:#999;font-size:11px">... and ' + moreCount + ' more</div>' : '';
+
+      const precHtml = (function() {
+        const cp = ex.cloudPrecision, ap = ex.azurePrecision;
+        const cpStr = (cp !== undefined && cp !== null) ? cp : '<span class="null-val">N/A</span>';
+        const apStr = (ap !== undefined && ap !== null) ? ap : '<span class="null-val">N/A</span>';
+        const same = cp !== null && ap !== null && cp !== undefined && ap !== undefined && String(parseFloat(cp)) === String(parseFloat(ap));
+        return '<span class="cloud-val">Core: ' + cpStr + '</span><br><span class="azure-val">Azure: ' + apStr + '</span>' + (same ? ' <span style="color:#4caf50">&#10003;</span>' : '');
+      })();
+
+      examplesHtml +=
+        '<tr><td><strong>' + ex.testId + '</strong></td><td>' + ex.sampleId + '</td><td>' + (ex.resultValue || '—') + '</td><td>' + ex.totalDiffs + '</td>' +
+        '<td>' + (typeof ex.cloudAll === 'string' ? '<span style="color:#e74c3c;font-size:11px">' + ex.cloudAll + '</span>' : (ex.cloudAll || 0) + ' entries') + '</td>' +
+        '<td>' + (ex.azureAll || 0) + ' entries</td>' +
+        '<td style="font-size:11px;line-height:1.6">' + precHtml + '</td></tr>' +
+        '<tr><td colspan="7" style="padding:4px 10px">' +
+          '<div class="collapsible" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'show\')">Show ' + diffs.length + ' field differences</div>' +
+          '<div class="collapse-content">' +
+            '<div class="legend-row"><div class="legend-item"><div class="legend-swatch" style="background:#ffebee"></div> missing</div><div class="legend-item"><div class="legend-swatch" style="background:#e8f5e9"></div> extra</div><div class="legend-item"><div class="legend-swatch" style="background:#fff3e0"></div> different</div></div>' +
+            '<div class="diff-detail">' + diffsHtml + moreHtml + '</div>' +
+          '</div>' +
+        '</td></tr>';
+    }
+
+    const topTestIdsHtml = (p.testIds || []).slice(0, 25).map(function(t) {
+      return '<span class="testid-chip">' + t + '</span>';
+    }).join('');
+
+    const impactClass = rc.impact === 'low' ? 'impact-low' : rc.impact === 'medium' ? 'impact-medium' : '';
+
+    sections.innerHTML +=
+      '<a class="anchor" id="pattern-' + key + '"></a>' +
+      '<div class="pattern-section">' +
+        '<div class="pattern-header"><span class="pattern-badge" style="background:' + cfg.color + '">Pattern ' + key + '</span><h2>' + p.name + '</h2></div>' +
+        '<div class="pattern-desc">' + cfg.desc + '</div>' +
+        '<div class="pattern-stats">Records: <span>' + p.count + '</span> (<span>' + p.pct + '%</span> excluding Pattern A) &nbsp;|&nbsp; Distinct TestIds: <span>' + p.testIds.length + '</span> &nbsp;|&nbsp; Distinct SampleIds: <span>' + p.sampleIds.length + '</span></div>' +
+        '<div class="root-cause">' + (rc.cause || '') + '<br><br><strong>Suggested Fix:</strong> ' + (rc.fix || '') + '</div>' +
+        '<div class="impact-note ' + impactClass + '">&#9888;&#65039; <strong>Impact (' + (rc.impact || 'unknown') + '):</strong> ' + (rc.impactText || '') + '</div>' +
+        '<h3 style="margin:14px 0 6px;font-size:14px">Top Affected TestIds</h3>' +
+        '<div class="testid-list">' + topTestIdsHtml + '</div>' +
+        '<h3 style="margin:14px 0 6px;font-size:14px">Example Records (click to expand diff details)</h3>' +
+        '<table class="example-table"><thead><tr><th>TestId</th><th>SampleId</th><th>Result Value</th><th>Diff Count</th><th>CloudCore</th><th>Azure</th><th>Precision Digit</th></tr></thead><tbody>' + examplesHtml + '</tbody></table>' +
+      '</div>';
+  }
+}
+
+loadReport();
+</script>
+</body>
+</html>

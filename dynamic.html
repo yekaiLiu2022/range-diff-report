@@ -71,7 +71,7 @@
 </head>
 <body>
 <div class="container">
-  <h1>Range Data Diff Report <span style="font-size:14px;color:#4caf50;font-weight:400">(Live — last 4 hours)</span></h1>
+  <h1>Range Data Diff Report <span id="hoursLabel" style="font-size:14px;color:#4caf50;font-weight:400">(Live — last 4 hours)</span></h1>
   <p class="subtitle">
     <strong>CloudCore V1</strong> (production, on-premise) vs <strong>Azure LIS-Lab-test</strong> (AKS) &nbsp;|&nbsp;
     Table: <code>lis_report_info.range_data_comparison</code> &nbsp;|&nbsp; Generated: <span id="generatedAt">loading...</span>
@@ -111,7 +111,11 @@
 
 <script>
 const API_BASE = 'https://api.vibrant-wellness.com/v1/lis/base-report-service';
-const API_URL = API_BASE + '/result/rangeDiffReport?hours=4';
+// Support dynamic hours via URL query parameter: dynamic.html?hours=10
+// Defaults to 4 hours if not specified
+const HOURS = Number(new URLSearchParams(window.location.search).get('hours')) || 4;
+const API_URL = API_BASE + '/result/rangeDiffReport?hours=' + HOURS;
+document.getElementById('hoursLabel').textContent = '(Live \u2014 last ' + HOURS + ' hours)';
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwdXJwb3NlIjoicmFuZ2UtZGlmZi1yZXBvcnQiLCJpYXQiOjE3NzUxNTg0OTIsImV4cCI6MTc4MjkzNDQ5Mn0.UAfXnyAOVU7mrpoAZBQoCksLI3n_9fq1IU3eNGhIDRs'; // minimal token: payload is only {purpose: "range-diff-report", iat, exp}. No userId/role/customerId — cannot be used to access any report data, only passes JWT signature check for this endpoint. Expires ~2026-07-01.
 
 const PATTERN_CONFIG = {

@@ -89,7 +89,7 @@
     <div style="background:#fff3e0;border-radius:12px;padding:18px 24px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #ff9800">
       <h3 style="margin-bottom:8px;color:#e65100">Pattern A: Azure "Error enriching collection time" — <span id="patternACount">—</span> records (<span id="patternAPct">—</span>% of total)</h3>
       <p style="font-size:13px;color:#555;margin-bottom:8px">Old samples (2022-2023) whose tube receive data was never migrated from 153 legacy DB to Core V1/V2 DB. Azure LIS-Lab-test queries <code>lis_core_v7.tube_receive</code> → finds nothing → returns error. CloudCore V1 reads 153 slave DB directly and works fine.</p>
-      <p style="font-size:13px;color:#555;margin-bottom:0"><strong>Status:</strong> Wang has communicated to the LIS-Lab-test team (2026-04-01). <strong>Not shown below.</strong></p>
+      <p style="font-size:13px;color:#555;margin-bottom:0"><strong>Status:</strong> Wang has communicated to the LIS-Lab-test team (2026-04-01). <strong>Examples shown in section below (up to 15).</strong></p>
     </div>
 
     <div class="summary-grid" id="summaryGrid"></div>
@@ -120,6 +120,7 @@ document.getElementById('hoursStatLabel').textContent = HOURS;
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwdXJwb3NlIjoicmFuZ2UtZGlmZi1yZXBvcnQiLCJpYXQiOjE3NzUxNTg0OTIsImV4cCI6MTc4MjkzNDQ5Mn0.UAfXnyAOVU7mrpoAZBQoCksLI3n_9fq1IU3eNGhIDRs'; // minimal token: payload is only {purpose: "range-diff-report", iat, exp}. No userId/role/customerId — cannot be used to access any report data, only passes JWT signature check for this endpoint. Expires ~2026-07-01.
 
 const PATTERN_CONFIG = {
+  A: { color: '#ff9800', desc: 'Azure (LIS-Lab-test) returns "Error enriching collection time" — old samples\' tube receive data was never migrated from 153 legacy DB to Core V1/V2.' },
   B: { color: '#e74c3c', desc: 'CloudCore returns error (missing master data), Azure has correct range data' },
   C1: { color: '#f39c12', desc: 'l3/l4 lower bound difference — Azure l3 too high (0.01/0.1 vs Core 0.0/0). ✅ DB fixed, waiting cache refresh.' },
   C2: { color: '#ff6b6b', desc: 'Gender mismatch — Core V1 uses Male, Azure uses Female (Core Samples V2 returns wrong gender). Root cause = V2 patient data.' },
@@ -131,6 +132,7 @@ const PATTERN_CONFIG = {
 };
 
 const ROOT_CAUSES = {
+  A: { cause: 'LIS-Lab-test (Go) calls <code>SampleClient.GetSampleReceiveRecords</code> against Core V1 (<code>192.168.60.6:30276</code>, temporary V2 unavailable). For old samples (mostly 2022-2023), tube receive data only exists in 153 legacy DB and was never migrated to Core V1 (<code>lis_core_v7.tube_receive</code>) or V2 (<code>coresamplesv2.tube_receive</code>). Empty result → LIS-Lab-test wraps it as "Error enriching collection time".<br><br>CloudCore V1 (the comparison side) reads 153 slave DB directly via its own path so it still works for these old samples — that\'s why CloudCore has data and Azure does not.', impact: 'medium', impactText: 'Old samples (2022-2023) get no range data via the Azure LIS-Lab-test path. CloudCore V1 still works for these samples, so report rendering on CloudCore-served paths is unaffected.', fix: 'Backfill tube receive data from 153 legacy DB to Core V1/V2, OR add a 153 fallback inside LIS-Lab-test / Core V2. Wang has communicated to the LIS-Lab-test team (2026-04-01).' },
   B: { cause: '<strong>Sub-type 1 — Core V1 hormones filtering bug:</strong> Core V1 HAS the range data, but detects <code>is_hormones_test=true</code> (FEMALE ranges have hormones phases), then filters by <code>sample_menstrual_phase</code> — Male patients have no phase → empty result. <strong>Core V1 bug.</strong><br><br><strong>Sub-type 2 — Negative age from bad DOB:</strong> Patients with DOB after collection time get negative age. Core V1 strict filter rejects. Azure skips age filter for Unisex+universal-age tests. <strong>DOB data issue.</strong>', impact: 'high', impactText: 'Sub-type 1: Male patients get NO range for hormone-related tests on Core V1. Sub-type 2: bad DOB data causes no range from Core V1.', fix: 'Sub-type 1: Fix Core V1 — do not apply menstrual phase filter for Male patients. Sub-type 2: Fix DOB data.' },
   C1: { cause: 'Azure\'s LOW_ABNORMAL l3 lower bound is too high. CloudCore uses <code>0.0</code> or <code>0</code>, Azure uses <code>0.01</code> or <code>0.1</code>. This creates a gap at the bottom of the zone — 0 is a valid measurement.', impact: 'medium', impactText: '✅ <strong>Status: DB fixed by Wang</strong>, waiting cache refresh. Azure l3 values create gaps at bottom of LOW_ABNORMAL zone.', fix: '✅ Fixed — Azure DB updated l3 values. Waiting for cache to refresh.' },
   C2: { cause: 'Core V1 and Azure return range entries for <strong>different genders</strong>. Root cause: <strong>Core Samples V2 returns wrong patient gender</strong> (e.g., Female for a Male patient). Core V1 reads 153 Legacy DB → gets correct Male → matches Male ranges. Azure reads V2 → gets Female → matches Female ranges. Verified with iron evidence: sampleId 2525158 is Male in 153 DB and Core V1, but V2 returns Female (confirmed by Wang).', impact: 'high', impactText: 'Patients get range data for the wrong gender. Same root cause as Pattern E.', fix: 'Fix Core Samples V2 patient gender data to match 153 DB / Core V1.' },
@@ -173,11 +175,12 @@ function renderReport(DATA) {
   document.getElementById('patternACount').textContent = patternACount;
   document.getElementById('patternAPct').textContent = patternAPct;
 
-  const patternOrder = ['B', 'C1', 'C2', 'C3', 'D', 'E', 'F1', 'F2'];
+  const patternOrder = ['A', 'B', 'C1', 'C2', 'C3', 'D', 'E', 'F1', 'F2'];
 
   // Summary cards
   const grid = document.getElementById('summaryGrid');
   for (const key of patternOrder) {
+    if (key === 'A') continue; // Pattern A already shown in dedicated banner above
     const p = DATA[key];
     if (!p || p.count === 0) continue;
     const cfg = PATTERN_CONFIG[key] || {};
@@ -188,8 +191,8 @@ function renderReport(DATA) {
     '</div>';
   }
 
-  // Pie chart
-  const activePatterns = patternOrder.filter(k => DATA[k]?.count > 0);
+  // Pie chart — chart title says "excluding Pattern A", so explicitly drop A
+  const activePatterns = patternOrder.filter(k => k !== 'A' && DATA[k]?.count > 0);
   new Chart(document.getElementById('pieChart'), {
     type: 'doughnut',
     data: {
@@ -266,18 +269,22 @@ function renderReport(DATA) {
         return '<span class="cloud-val">Core: ' + cpStr + '</span><br><span class="azure-val">Azure: ' + apStr + '</span>' + (same ? ' <span style="color:#4caf50">&#10003;</span>' : '');
       })();
 
+      const diffDetailRow = diffs.length > 0
+        ? '<tr><td colspan="7" style="padding:4px 10px">' +
+            '<div class="collapsible" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'show\')">Show ' + diffs.length + ' field differences</div>' +
+            '<div class="collapse-content">' +
+              '<div class="legend-row"><div class="legend-item"><div class="legend-swatch" style="background:#ffebee"></div> missing</div><div class="legend-item"><div class="legend-swatch" style="background:#e8f5e9"></div> extra</div><div class="legend-item"><div class="legend-swatch" style="background:#fff3e0"></div> different</div></div>' +
+              '<div class="diff-detail">' + diffsHtml + moreHtml + '</div>' +
+            '</div>' +
+          '</td></tr>'
+        : '';
+
       examplesHtml +=
         '<tr><td><strong>' + ex.testId + '</strong></td><td>' + ex.sampleId + '</td><td>' + (ex.resultValue || '—') + '</td><td>' + ex.totalDiffs + '</td>' +
         '<td>' + (typeof ex.cloudAll === 'string' ? '<span style="color:#e74c3c;font-size:11px">' + ex.cloudAll + '</span>' : (ex.cloudAll || 0) + ' entries') + '</td>' +
-        '<td>' + (ex.azureAll || 0) + ' entries</td>' +
+        '<td>' + (typeof ex.azureAll === 'string' ? '<span style="color:#e74c3c;font-size:11px">' + ex.azureAll + '</span>' : (ex.azureAll || 0) + ' entries') + '</td>' +
         '<td style="font-size:11px;line-height:1.6">' + precHtml + '</td></tr>' +
-        '<tr><td colspan="7" style="padding:4px 10px">' +
-          '<div class="collapsible" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'show\')">Show ' + diffs.length + ' field differences</div>' +
-          '<div class="collapse-content">' +
-            '<div class="legend-row"><div class="legend-item"><div class="legend-swatch" style="background:#ffebee"></div> missing</div><div class="legend-item"><div class="legend-swatch" style="background:#e8f5e9"></div> extra</div><div class="legend-item"><div class="legend-swatch" style="background:#fff3e0"></div> different</div></div>' +
-            '<div class="diff-detail">' + diffsHtml + moreHtml + '</div>' +
-          '</div>' +
-        '</td></tr>';
+        diffDetailRow;
     }
 
     const topTestIdsHtml = (p.testIds || []).slice(0, 25).map(function(t) {
